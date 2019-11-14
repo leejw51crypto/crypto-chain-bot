@@ -32,6 +32,8 @@ import re
 import asyncio
 import json
 import shutil
+import base64
+import hashlib
 from pathlib import Path
 from docopt import docopt
 
@@ -86,7 +88,7 @@ DEV_CONF = '''{
         "per_byte_fee": "%(per_byte_fee)s"
     },
     "council_nodes": {
-        "0x3ae55c16800dc4bd0e3397a9d7806fb1f11639de": [
+        "%(staking)s": [
             "integration test",
             "security@integration.test",
         {
@@ -206,6 +208,10 @@ async def write_dev_conf(path, **kwargs):
     open(path, 'w').write(DEV_CONF % kwargs)
 
 
+def validator_address(pubkey):
+    return hashlib.sha256(base64.b64decode(pubkey)).hexdigest()[:40].upper()
+
+
 async def update_genesis(dev_conf_path, genesis_path):
     if opt['--docker']:
         result = await interact(f'''
@@ -223,7 +229,20 @@ docker run -i --rm \
     app = json.loads('{%s}' % result.decode('utf-8'))
     genesis.update(app)
 
-    json.dump(genesis, open(genesis_path, 'w'))
+    # update validators in genesis
+    genesis['validators'] = [
+        {
+            'address': validator_address(node[2]['consensus_pubkey_b64']),
+            'pub_key': {
+                'type': 'tendermint/PubKeyEd25519',
+                'value': node[2]['consensus_pubkey_b64'],
+            },
+            'power': str(int(int(genesis['app_state']['distribution'][addr][1]) / 10 ** 8)),
+        }
+        for addr, node in genesis['app_state']['council_nodes'].items()
+    ]
+
+    json.dump(genesis, open(genesis_path, 'w'), indent=4)
 
 
 async def build():
@@ -245,6 +264,7 @@ async def init():
         else:
             print('Root path already exists, quit')
             return
+    ROOT_PATH.mkdir()
     print('Init tendermint')
     await init_tendermint(ROOT_PATH / TENDERMINT_PATH)
 
