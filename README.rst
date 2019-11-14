@@ -1,6 +1,8 @@
 Prerequisite
 ============
 
+* `tendermint <https://tendermint.com/downloads>`_ binary in path.
+* `docker <https://docs.docker.com/install/>`_
 * python3
 * ``pip3 install docopt``
 * ``pip3 install supervisor``
