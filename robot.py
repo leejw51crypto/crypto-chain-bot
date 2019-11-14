@@ -197,15 +197,18 @@ docker build -t "{CHAIN_TX_ENCLAVE_DOCKER_IMAGE}" \
 
 
 async def init_tendermint(path):
-    await run(f'''
+    if opt['--docker']:
+        await run(f'''
 docker run --rm -v "{path}:/tendermint" \
     --env TMHOME=/tendermint \
     --user "{os.getuid()}:{os.getgid()}" \
     "tendermint/tendermint:v{TENDERMINT_VERSION}" init \
     ''')
+    else:
+        await run(f'tendermint init --home {path}')
+
     await run(f'''
-sed -i -e "s/index_all_tags = false/index_all_tags = true/g" \
-"{path}/config/config.toml"
+sed -i -e "s/index_all_tags = false/index_all_tags = true/g" "{path}/config/config.toml"
     ''')
 
 
@@ -316,7 +319,7 @@ async def init():
             print('Root path already exists, delete it')
             shutil.rmtree(ROOT_PATH)
         else:
-            print('Root path already exists, quit')
+            print('Root path already exists, quit, use -f,--force to remove it.')
             return
     ROOT_PATH.mkdir()
     print('Init tendermint')
@@ -381,12 +384,10 @@ async def start_native():
 
 
 async def stop_native():
-    print('Try stop current services')
-    # enclave_container_name = opt['--project-name'] + '-tx-enclave'
-    # await run(f'docker rm -f {enclave_container_name}', ignore_error=True),
     supervisor_path = ROOT_PATH / SUPERVISOR_PATH
     pid_path = supervisor_path / Path('supervisord.pid')
     if pid_path.exists():
+        print('stop current services')
         pid = pid_path.read_bytes().strip().decode()
         await run(f'kill -QUIT {pid}', ignore_error=True),
     await asyncio.sleep(1)
