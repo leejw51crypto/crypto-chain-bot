@@ -11,16 +11,17 @@ Run
 ::
 
     $ ./robot.py --help
-    test robot CLI
+    build robot CLI
 
     Usage:
-      robot.py build [--docker] [--enclave-mode <mode>]
-      robot.py init [-d,--data <path>] [--base-fee <fee>] [--per-byte-fee <fee>] [--tendermint <version>] [--docker] [-f, --force]
+      robot.py build [--docker] [--enclave-mode <mode>] [--src <path>]
+      robot.py init [-d,--data <path>] [--base-fee <fee>] [--per-byte-fee <fee>] [--tendermint <version>] [--docker] [-f, --force] [--src <path>]
       robot.py compose  [-d,--data <path>] [--src <path>] [--project-name <name] [--tendermint-rpc-port <port>] [--client-rpc-port <port>]
-      robot.py runlocal [-d,--data <path>] [--src <path>] [--tendermint-rpc-port <port>] [--enclave-port <port>] [--chain-abci-port <port>]
+      robot.py start-native [-d,--data <path>] [--src <path>] [--tendermint-rpc-port <port>] [--enclave-port <port>] [--chain-abci-port <port>] [--project-name <name>]
+      robot.py stop-native [-d,--data <path>] [--project-name <name>]
       robot.py (-h | --help)
       robot.py --version
-
+    
     Options:
       -d,--data <path>               Set data root directory [default: .].
       --src <path>                   Set chain source directory [default: .].
@@ -33,12 +34,10 @@ Run
       --tendermint-rpc-port <port>   Exported tendermint rpc port [default: 26657].
       --chain-abci-port <port>       chain-abci listen port when runlocal [default: 26658].
       --enclave-port <port>          tx-enclave listen port when runlocal [default: 25933].
-      --chain-port <port>   Exported tendermint rpc port [default: 26657].
       --client-rpc-port <port>       Exported client rpc port [default: 26659].
       --project-name <name>          Docker project name [default: test].
       -h --help                      Show this screen.
       -v,--version                   Show version.
-    build bot for crypto-com-chain
 
 Examples
 ========
