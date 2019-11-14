@@ -3,7 +3,7 @@
 
 Usage:
   robot.py build [--docker] [--enclave-mode <mode>] [--src <path>]
-  robot.py init [-d,--data <path>] [--base-fee <fee>] [--per-byte-fee <fee>] [--tendermint <version>] [--docker] [-f, --force]
+  robot.py init [-d,--data <path>] [--base-fee <fee>] [--per-byte-fee <fee>] [--tendermint <version>] [--docker] [-f, --force] [--src <path>]
   robot.py compose  [-d,--data <path>] [--src <path>] [--project-name <name] [--tendermint-rpc-port <port>] [--client-rpc-port <port>]
   robot.py runlocal [-d,--data <path>] [--src <path>] [--tendermint-rpc-port <port>] [--enclave-port <port>] [--chain-abci-port <port>]
   robot.py (-h | --help)
@@ -60,6 +60,7 @@ CHAIN_PATH = Path('chain')
 DEVCONF_PATH = Path('dev_conf.json')
 CLIENT_CMD = Path('target/debug/client-cli')
 CHAIN_CMD = Path('target/debug/chain-abci')
+DEVUTIL_PATH = Path('target/debug/dev-utils')
 
 DEV_CONF = '''{
     "rewards_pool": "6250000000000000000",
@@ -112,8 +113,7 @@ async def run(cmd, ignore_error=False, **kwargs):
 
 
 async def interact(cmd, input=None, **kwargs):
-    if opt['--verbose']:
-        print(cmd)
+    print(cmd)
     proc = await asyncio.create_subprocess_shell(
         cmd,
         stdin=asyncio.subprocess.PIPE,
@@ -121,7 +121,7 @@ async def interact(cmd, input=None, **kwargs):
         **kwargs
     )
     (stdout, stderr) = await proc.communicate(input=input)
-    assert proc.returncode == 0, f'{stdout} ({cmd})'
+    assert proc.returncode == 0, f'{stdout.decode("utf-8")} ({cmd})'
     return stdout
 
 
@@ -167,7 +167,7 @@ client-cli {args} \
         ''', input)
     else:
         return await interact(
-            f'{CLIENT_CMD} {args}',
+            f'{SRC_PATH / CLIENT_CMD} {args}',
             input,
             env=dict(os.environ,
                      CRYPTO_CLIENT_STORAGE=storage,
@@ -207,7 +207,7 @@ docker run -i --rm \
     dev-utils genesis generate -g /dev-conf.conf
         ''')
     else:
-        result = await interact(f'target/debug/dev-utils genesis generate -g "{dev_conf_path}"')
+        result = await interact(f'{SRC_PATH / DEVUTIL_PATH} genesis generate -g "{dev_conf_path}"')
 
     genesis = json.load(open(genesis_path))
     genesis['chain_id'] = CHAIN_ID
