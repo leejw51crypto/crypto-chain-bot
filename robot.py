@@ -303,6 +303,7 @@ async def runlocal():
     chain_port = opt['--chain-abci-port']
     tendermint_port = opt['--tendermint-rpc-port']
     await run(f'docker rm -f {enclave_container_name}', ignore_error=True)
+    await asyncio.sleep(.5)
     await run(f'''
 docker run -d \
 -p {enclave_port}:25933 \
@@ -312,12 +313,14 @@ docker run -d \
 -v {ROOT_PATH / ENCLAVE_PATH}:/enclave-storage \
 chain-tx-validation \
     ''')
+    await asyncio.sleep(1)
     await run(f'''
 {SRC_PATH / CHAIN_CMD} -g {app_hash} -c {CHAIN_ID} \
 --enclave_server tcp://127.0.0.1:{enclave_port} \
 --data {ROOT_PATH / CHAIN_PATH} \
--p {chain_port} > {ROOT_PATH / CHAIN_PATH / Path('stdout.log')} &
+-p {chain_port} > {ROOT_PATH / Path('chain-stdout.log')} &
     ''')
+    await asyncio.sleep(1)
     await run(f'''
 tendermint node --proxy_app=tcp://127.0.0.1:{chain_port} \
 --home={ROOT_PATH / TENDERMINT_PATH} \
