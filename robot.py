@@ -58,6 +58,7 @@ TENDERMINT_PATH = Path('tendermint')
 WALLET_PATH = Path('wallet')
 CHAIN_PATH = Path('chain')
 DEVCONF_PATH = Path('dev_conf.json')
+ADDRESS_STATE_PATH = Path('address-state.json')
 CLIENT_CMD = Path('target/debug/client-cli')
 CHAIN_CMD = Path('target/debug/chain-abci')
 DEVUTIL_PATH = Path('target/debug/dev-utils')
@@ -190,6 +191,13 @@ async def create_wallet_address(name, type='Staking', **kwargs):
     return re.search(prefix + r'[0-9a-zA-Z]+', result.decode('utf-8')).group()
 
 
+async def save_wallet_addresses(path, staking_addr, transfer_addrs):
+    json.dump({
+        'staking': staking_addr,
+        'transfer': transfer_addrs,
+    }, open(path, 'w'))
+
+
 async def write_wallet_addresses(path, staking, transfer1, transfer2):
     open(path, 'w').write(ADDRESS_STATE % locals())
 
@@ -254,6 +262,8 @@ async def init():
     transfer2 = await create_wallet_address(
         WALLET_NAME, type='Transfer')
     print('transfer address2:', transfer2)
+
+    await save_wallet_addresses(ROOT_PATH / ADDRESS_STATE_PATH, staking, [transfer1, transfer2])
 
     genesis = json.load(open(ROOT_PATH / TENDERMINT_PATH / GENESIS_PATH))
     validator_pub_key = genesis['validators'][0]['pub_key']['value']
