@@ -116,6 +116,15 @@ ADDRESS_STATE = '''{
 }'''
 
 
+def check_prerequisite():
+    assert shutil.which('docker') is not None, 'docker not found'
+
+    if not opt['--docker']:
+        assert shutil.which('tendermint') is not None, 'tendermint not found'
+        assert shutil.which('supervisord') is not None, 'supervisor not found'
+        assert shutil.which('supervisorctl') is not None, 'supervisorctl not found'
+
+
 async def write_tasks_ini(path, app_hash):
     open(path, 'w').write(f'''
 [supervisord]
@@ -406,4 +415,5 @@ async def main():
         await stop_native()
 
 if __name__ == '__main__':
+    check_prerequisite()
     asyncio.run(main())
