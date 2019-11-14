@@ -2,28 +2,24 @@
 '''build robot CLI
 
 Usage:
-  robot.py build [--docker] [--enclave-mode <mode>] [--src <path>]
-  robot.py init [-d,--data <path>] [--base-fee <fee>] [--per-byte-fee <fee>] [--tendermint <version>] [--docker] [-f, --force] [--src <path>]
-  robot.py compose  [-d,--data <path>] [--src <path>] [--project-name <name] [--tendermint-rpc-port <port>] [--client-rpc-port <port>]
-  robot.py start-native [-d,--data <path>] [--src <path>] [--tendermint-rpc-port <port>] [--enclave-port <port>] [--chain-abci-port <port>] [--project-name <name>]
-  robot.py stop-native [-d,--data <path>] [--project-name <name>]
+  robot.py build [--docker] [--enclave-mode <mode>] [-s,--src <path>]
+  robot.py init [-d,--data <path>] [-p,--project-name <name>] [-s,--src <path>] [--docker] [-f,--force] [-P,--base-port <port>] [--base-fee <fee>] [--per-byte-fee <fee>]
+  robot.py compose  [-d,--data <path>] [-p,--project-name <name>] [-s,--src <path>] [-P,--base-port <port>]
+  robot.py start-native [-d,--data <path>] [-p,--project-name <name>] [-s,--src <path>]
+  robot.py stop-native [-d,--data <path>] [-p,--project-name <name>]
   robot.py (-h | --help)
   robot.py --version
 
 Options:
   -d,--data <path>               Set data root directory [default: .].
-  --src <path>                   Set chain source directory [default: .].
-  -f,--force                     Override existing data directory.
+  -p,--project-name <name>       Used as data directory name and prefix of docker container name [default: default].
+  -s,--src <path>                Set chain source directory [default: .].
+  -P,--base-port <port>          Base port number when running in local [default: 26650].
   --docker                       Use docker.
-  --tendermint <version>         Version of terdermint [default: 0.32.0].
   --base-fee <fee>               Base fee [default: 0.0].
   --per-byte-fee <fee>           Per byte fee [default: 0.0].
   --enclave-mode <mode>          Envlave mode, SW|HW [default: SW].
-  --tendermint-rpc-port <port>   Exported tendermint rpc port [default: 26657].
-  --chain-abci-port <port>       chain-abci listen port when runlocal [default: 26658].
-  --enclave-port <port>          tx-enclave listen port when runlocal [default: 25933].
-  --client-rpc-port <port>       Exported client rpc port [default: 26659].
-  --project-name <name>          Docker project name [default: test].
+  -f,--force                     Override existing data directory.
   -h --help                      Show this screen.
   -v,--version                   Show version.
 '''
@@ -39,6 +35,15 @@ from docopt import docopt
 
 opt = docopt(__doc__, version='Crypto-com build robot 0.1')
 # print(opt)
+BASE_PORT = int(opt['--base-port'])
+assert BASE_PORT % 10 == 0, 'invalid --base-port'
+
+# ports
+ENCLAVE_PORT = BASE_PORT
+CHAIN_ABCI_PORT = BASE_PORT + 1
+TENDERMINT_P2P_PORT = BASE_PORT + 2
+TENDERMINT_RPC_PORT = BASE_PORT + 3
+CLIENT_RPC_PORT = BASE_PORT + 4
 
 # constants
 CHAIN_DOCKER_IMAGE = "integration-tests-chain"
@@ -52,7 +57,7 @@ CHAIN_HEX_ID = CHAIN_ID[-2:]
 # paths
 BASE_DIR = Path(__file__).parent
 COMPOSE_FILE = BASE_DIR / 'docker-compose.yml'
-ROOT_PATH = Path(opt['--data']).resolve()
+ROOT_PATH = (Path(opt['--data']) / Path(opt['--project-name'])).resolve()
 SRC_PATH = Path(opt['--src']).resolve()
 GENESIS_PATH = Path('config/genesis.json')
 ENCLAVE_PATH = Path('enclave')
@@ -125,8 +130,15 @@ file=%(here)s/supervisor.sock
 [supervisorctl]
 serverurl=unix://%(here)s/supervisor.sock
 
+[program:tx-enclave]
+command=docker run --rm -p {ENCLAVE_PORT}:25933 --env RUST_BACKTRACE=1 --env RUST_LOG=info --name {opt['--project-name'] + '-tx-enclave'} -v {ROOT_PATH / ENCLAVE_PATH}:/enclave-storage chain-tx-validation
+stdout_logfile=%(here)s/tx-enclave.log
+autostart=true
+autorestart=true
+redirect_stderr=true
+
 [program:chain-abci]
-command={SRC_PATH / CHAIN_CMD} -g {app_hash} -c {CHAIN_ID} --enclave_server tcp://127.0.0.1:{opt['--enclave-port']} --data {ROOT_PATH / CHAIN_PATH} -p {opt['--chain-abci-port']}
+command={SRC_PATH / CHAIN_CMD} -g {app_hash} -c {CHAIN_ID} --enclave_server tcp://127.0.0.1:{ENCLAVE_PORT} --data {ROOT_PATH / CHAIN_PATH} -p {CHAIN_ABCI_PORT}
 environment=RUST_BACKTRACE=1,RUST_LOG=info
 stdout_logfile=%(here)s/chain-abci.log
 autostart=true
@@ -134,16 +146,16 @@ autorestart=true
 redirect_stderr=true
 
 [program:tendermint]
-command=tendermint node --proxy_app=tcp://127.0.0.1:{opt['--chain-abci-port']} --home={ROOT_PATH / TENDERMINT_PATH} --rpc.laddr=tcp://127.0.0.1:{opt['--tendermint-rpc-port']} --consensus.create_empty_blocks=true
+command=tendermint node --proxy_app=tcp://127.0.0.1:{CHAIN_ABCI_PORT} --home={ROOT_PATH / TENDERMINT_PATH} --rpc.laddr=tcp://127.0.0.1:{TENDERMINT_RPC_PORT} --p2p.laddr=tcp://127.0.0.1:{TENDERMINT_P2P_PORT} --consensus.create_empty_blocks=true
 stdout_logfile=%(here)s/tendermint.log
 autostart=true
 autorestart=true
 redirect_stderr=true
 
-[program:node-rpc]
-command={SRC_PATH / CLIENT_RPC_CMD} --port={opt['--client-rpc-port']} --chain-id={CHAIN_ID} --storage-dir={ROOT_PATH / WALLET_PATH} --websocket-url=ws://127.0.0.1:{opt['--tendermint-rpc-port']}/websocket
+[program:client-rpc]
+command={SRC_PATH / CLIENT_RPC_CMD} --port={CLIENT_RPC_PORT} --chain-id={CHAIN_ID} --storage-dir={ROOT_PATH / WALLET_PATH} --websocket-url=ws://127.0.0.1:{TENDERMINT_RPC_PORT}/websocket
 environment=RUST_BACKTRACE=1,RUST_LOG=info
-stdout_logfile=%(here)s/node-rpc.log
+stdout_logfile=%(here)s/client-rpc.log
 autostart=true
 autorestart=true
 redirect_stderr=true
@@ -357,34 +369,22 @@ async def compose():
                        CHAIN_ID=CHAIN_ID,
                        APP_HASH=app_hash,
                        TENDERMINT_VERSION=opt['--tendermint'],
-                       TENDERMINT_RPC_PORT=opt['--tendermint-rpc-port'],
-                       CLIENT_RPC_PORT=opt['--client-rpc-port'],
+                       TENDERMINT_RPC_PORT=TENDERMINT_RPC_PORT,
+                       CLIENT_RPC_PORT=CLIENT_RPC_PORT,
                        ))
 
 
 async def start_native():
     await stop_native()
-    enclave_container_name = opt['--project-name'] + '-tx-enclave'
-    enclave_port = opt['--enclave-port']
-    await run(f'''
-docker run -d \
--p {enclave_port}:25933 \
---env RUST_BACKTRACE=1 \
---env RUST_LOG=info \
---name {enclave_container_name} \
--v {ROOT_PATH / ENCLAVE_PATH}:/enclave-storage \
-chain-tx-validation \
-    ''')
-    await asyncio.sleep(1)
     supervisor_path = ROOT_PATH / SUPERVISOR_PATH
     await run(f'supervisord -d {supervisor_path} -c {supervisor_path / TASKS_INI_PATH} -l {supervisor_path / Path("supervisord.log")} -j {supervisor_path / Path("supervisord.pid")}')
 
 
 async def stop_native():
     print('Try stop current services')
-    enclave_container_name = opt['--project-name'] + '-tx-enclave'
+    # enclave_container_name = opt['--project-name'] + '-tx-enclave'
+    # await run(f'docker rm -f {enclave_container_name}', ignore_error=True),
     supervisor_path = ROOT_PATH / SUPERVISOR_PATH
-    await run(f'docker rm -f {enclave_container_name}', ignore_error=True),
     pid_path = supervisor_path / Path('supervisord.pid')
     if pid_path.exists():
         pid = pid_path.read_bytes().strip().decode()

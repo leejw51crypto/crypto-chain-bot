@@ -5,8 +5,20 @@ Prerequisite
 * ``pip3 install docopt``
 * ``pip3 install supervisor``
 
+Port Usage
+==========
+
+* base-port: 26650
+* tx-enclave: base-port + 0
+* chain-abci: base-port + 1
+* tendermint-p2p-port: base-port + 2
+* tendermint-rpc-port: base-port + 3
+* client-rpc-port: base-port + 4
+
 Run
 ===
+
+* Root data directory is ``opt[--data] / opt[--project-name]``
 
 ::
 
@@ -14,28 +26,24 @@ Run
     build robot CLI
 
     Usage:
-      robot.py build [--docker] [--enclave-mode <mode>] [--src <path>]
-      robot.py init [-d,--data <path>] [--base-fee <fee>] [--per-byte-fee <fee>] [--tendermint <version>] [--docker] [-f, --force] [--src <path>]
-      robot.py compose  [-d,--data <path>] [--src <path>] [--project-name <name] [--tendermint-rpc-port <port>] [--client-rpc-port <port>]
-      robot.py start-native [-d,--data <path>] [--src <path>] [--tendermint-rpc-port <port>] [--enclave-port <port>] [--chain-abci-port <port>] [--project-name <name>]
-      robot.py stop-native [-d,--data <path>] [--project-name <name>]
+      robot.py build [--docker] [--enclave-mode <mode>] [-s,--src <path>]
+      robot.py init [-d,--data <path>] [-p,--project-name <name>] [-s,--src <path>] [--docker] [-f,--force] [-P,--base-port <port>] [--base-fee <fee>] [--per-byte-fee <fee>]
+      robot.py compose  [-d,--data <path>] [-p,--project-name <name>] [-s,--src <path>] [-P,--base-port <port>]
+      robot.py start-native [-d,--data <path>] [-p,--project-name <name>] [-s,--src <path>]
+      robot.py stop-native [-d,--data <path>] [-p,--project-name <name>]
       robot.py (-h | --help)
       robot.py --version
-    
+
     Options:
       -d,--data <path>               Set data root directory [default: .].
-      --src <path>                   Set chain source directory [default: .].
-      -f,--force                     Override existing data directory.
+      -p,--project-name <name>       Used as data directory name and prefix of docker container name [default: default].
+      -s,--src <path>                Set chain source directory [default: .].
+      -P,--base-port <port>          Base port number when running in local [default: 26650].
       --docker                       Use docker.
-      --tendermint <version>         Version of terdermint [default: 0.32.0].
       --base-fee <fee>               Base fee [default: 0.0].
       --per-byte-fee <fee>           Per byte fee [default: 0.0].
       --enclave-mode <mode>          Envlave mode, SW|HW [default: SW].
-      --tendermint-rpc-port <port>   Exported tendermint rpc port [default: 26657].
-      --chain-abci-port <port>       chain-abci listen port when runlocal [default: 26658].
-      --enclave-port <port>          tx-enclave listen port when runlocal [default: 25933].
-      --client-rpc-port <port>       Exported client rpc port [default: 26659].
-      --project-name <name>          Docker project name [default: test].
+      -f,--force                     Override existing data directory.
       -h --help                      Show this screen.
       -v,--version                   Show version.
 
@@ -52,17 +60,18 @@ Examples
 
 * Init tendermint genesis, basic staking and transfer wallet addresses, chain storage::
 
-    $ ./robot.py init --src ../chain -d./zerofee
-    $ ./robot.py init --src ../chain -d./withfee --base-fee 1.1 --per-byte-fee 1.25
+    $ ./robot.py init --src ../chain -p zerofee
+    $ ./robot.py init --src ../chain -p withfee --base-fee 1.1 --per-byte-fee 1.25 -P 26660
 
 * Run services with native binaries::
 
-    $ ./robot.py start-native -d./zerofee --src ../chain
-    $ ./robot.py start-native -d./withfee --src ../chain
+    $ ./robot.py start-native --src ../chain -p zerofee
+    $ ./robot.py start-native --src ../chain -p withfee
 
 * Stop native services::
 
-    $ ./robot.py stop-native -d./zerofee
+    $ ./robot.py stop-native -p zerofee
+    $ ./robot.py stop-native -p withfee
 
 * Monitor native services::
 
@@ -70,4 +79,4 @@ Examples
 
 * Run services in docker::
 
-    $ ./robot.py compose --src ../chain -d./zerofee --docker
+    $ ./robot.py compose --src ../chain -p zerofee --docker
