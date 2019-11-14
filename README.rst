@@ -8,7 +8,7 @@ Prerequisite
 Run
 ===
 
-..code-block:: bash
+::
 
     $ ./robot.py --help
     test robot CLI
