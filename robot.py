@@ -5,7 +5,8 @@ Usage:
   robot.py build [--docker] [--enclave-mode <mode>] [--src <path>]
   robot.py init [-d,--data <path>] [--base-fee <fee>] [--per-byte-fee <fee>] [--tendermint <version>] [--docker] [-f, --force] [--src <path>]
   robot.py compose  [-d,--data <path>] [--src <path>] [--project-name <name] [--tendermint-rpc-port <port>] [--client-rpc-port <port>]
-  robot.py runlocal [-d,--data <path>] [--src <path>] [--tendermint-rpc-port <port>] [--enclave-port <port>] [--chain-abci-port <port>]
+  robot.py start-native [-d,--data <path>] [--src <path>] [--tendermint-rpc-port <port>] [--enclave-port <port>] [--chain-abci-port <port>] [--project-name <name>]
+  robot.py stop-native [-d,--data <path>] [--project-name <name>]
   robot.py (-h | --help)
   robot.py --version
 
@@ -37,7 +38,7 @@ from pathlib import Path
 from docopt import docopt
 
 opt = docopt(__doc__, version='Crypto-com build robot 0.1')
-print(opt)
+# print(opt)
 
 # constants
 CHAIN_DOCKER_IMAGE = "integration-tests-chain"
@@ -60,10 +61,12 @@ WALLET_PATH = Path('wallet')
 CHAIN_PATH = Path('chain')
 DEVCONF_PATH = Path('dev_conf.json')
 ADDRESS_STATE_PATH = Path('address-state.json')
+SUPERVISOR_PATH = Path('supervisor')
+TASKS_INI_PATH = Path('tasks.ini')
 CLIENT_CMD = Path('target/debug/client-cli')
 CHAIN_CMD = Path('target/debug/chain-abci')
-DEVUTIL_PATH = Path('target/debug/dev-utils')
-CLIENT_RPC_PATH = Path('target/debug/client-rpc')
+DEVUTIL_CMD = Path('target/debug/dev-utils')
+CLIENT_RPC_CMD = Path('target/debug/client-rpc')
 
 DEV_CONF = '''{
     "rewards_pool": "6250000000000000000",
@@ -106,6 +109,45 @@ ADDRESS_STATE = '''{
         "%(transfer2)s"
     ]
 }'''
+
+
+async def write_tasks_ini(path, app_hash):
+    open(path, 'w').write(f'''
+[supervisord]
+pidfile=%(here)s/supervisord.pid
+
+[rpcinterface:supervisor]
+supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
+
+[unix_http_server]
+file=%(here)s/supervisor.sock
+
+[supervisorctl]
+serverurl=unix://%(here)s/supervisor.sock
+
+[program:chain-abci]
+command={SRC_PATH / CHAIN_CMD} -g {app_hash} -c {CHAIN_ID} --enclave_server tcp://127.0.0.1:{opt['--enclave-port']} --data {ROOT_PATH / CHAIN_PATH} -p {opt['--chain-abci-port']}
+environment=RUST_BACKTRACE=1,RUST_LOG=info
+stdout_logfile=%(here)s/chain-abci.log
+autostart=true
+autorestart=true
+redirect_stderr=true
+
+[program:tendermint]
+command=tendermint node --proxy_app=tcp://127.0.0.1:{opt['--chain-abci-port']} --home={ROOT_PATH / TENDERMINT_PATH} --rpc.laddr=tcp://127.0.0.1:{opt['--tendermint-rpc-port']} --consensus.create_empty_blocks=true
+stdout_logfile=%(here)s/tendermint.log
+autostart=true
+autorestart=true
+redirect_stderr=true
+
+[program:node-rpc]
+command={SRC_PATH / CLIENT_RPC_CMD} --port={opt['--client-rpc-port']} --chain-id={CHAIN_ID} --storage-dir={ROOT_PATH / WALLET_PATH} --websocket-url=ws://127.0.0.1:{opt['--tendermint-rpc-port']}/websocket
+environment=RUST_BACKTRACE=1,RUST_LOG=info
+stdout_logfile=%(here)s/node-rpc.log
+autostart=true
+autorestart=true
+redirect_stderr=true
+''')
 
 
 async def run(cmd, ignore_error=False, **kwargs):
@@ -221,7 +263,7 @@ docker run -i --rm \
     dev-utils genesis generate -g /dev-conf.conf
         ''')
     else:
-        result = await interact(f'{SRC_PATH / DEVUTIL_PATH} genesis generate -g "{dev_conf_path}"')
+        result = await interact(f'{SRC_PATH / DEVUTIL_CMD} genesis generate -g "{dev_conf_path}"')
 
     genesis = json.load(open(genesis_path))
     genesis['chain_id'] = CHAIN_ID
@@ -296,6 +338,11 @@ async def init():
     print('Update genesis config')
     await update_genesis(ROOT_PATH / DEVCONF_PATH,
                          ROOT_PATH / TENDERMINT_PATH / GENESIS_PATH)
+    print('Write supervisor ini')
+    genesis = json.load(open(ROOT_PATH / TENDERMINT_PATH / GENESIS_PATH))
+    supervisor_path = ROOT_PATH / SUPERVISOR_PATH
+    supervisor_path.mkdir()
+    await write_tasks_ini(supervisor_path / TASKS_INI_PATH, genesis['app_hash'])
 
 
 async def compose():
@@ -315,15 +362,10 @@ async def compose():
                        ))
 
 
-async def runlocal():
-    genesis = json.load(open(ROOT_PATH / TENDERMINT_PATH / GENESIS_PATH))
-    app_hash = genesis['app_hash']
+async def start_native():
+    await stop_native()
     enclave_container_name = opt['--project-name'] + '-tx-enclave'
     enclave_port = opt['--enclave-port']
-    chain_port = opt['--chain-abci-port']
-    tendermint_port = opt['--tendermint-rpc-port']
-    await run(f'docker rm -f {enclave_container_name}', ignore_error=True)
-    await asyncio.sleep(1)
     await run(f'''
 docker run -d \
 -p {enclave_port}:25933 \
@@ -334,25 +376,20 @@ docker run -d \
 chain-tx-validation \
     ''')
     await asyncio.sleep(1)
-    await run(f'''
-{SRC_PATH / CHAIN_CMD} -g {app_hash} -c {CHAIN_ID} \
---enclave_server tcp://127.0.0.1:{enclave_port} \
---data {ROOT_PATH / CHAIN_PATH} \
--p {chain_port} > {ROOT_PATH / Path('chain-stdout.log')} &
-    ''')
+    supervisor_path = ROOT_PATH / SUPERVISOR_PATH
+    await run(f'supervisord -d {supervisor_path} -c {supervisor_path / TASKS_INI_PATH} -l {supervisor_path / Path("supervisord.log")} -j {supervisor_path / Path("supervisord.pid")}')
+
+
+async def stop_native():
+    print('Try stop current services')
+    enclave_container_name = opt['--project-name'] + '-tx-enclave'
+    supervisor_path = ROOT_PATH / SUPERVISOR_PATH
+    await run(f'docker rm -f {enclave_container_name}', ignore_error=True),
+    pid_path = supervisor_path / Path('supervisord.pid')
+    if pid_path.exists():
+        pid = pid_path.read_bytes().strip().decode()
+        await run(f'kill -QUIT {pid}', ignore_error=True),
     await asyncio.sleep(1)
-    await run(f'''
-tendermint node --proxy_app=tcp://127.0.0.1:{chain_port} \
---home={ROOT_PATH / TENDERMINT_PATH} \
---rpc.laddr=tcp://127.0.0.1:{tendermint_port} \
---consensus.create_empty_blocks=true &
-    ''')
-    await asyncio.sleep(1)
-    await run(f'''
-{SRC_PATH / CLIENT_RPC_PATH} --port={opt['--client-rpc-port']} --chain-id={CHAIN_ID} \
---storage-dir={ROOT_PATH / WALLET_PATH} \
---websocket-url=ws://127.0.0.1:{opt['--tendermint-rpc-port']}/websocket
-    ''')
 
 
 async def main():
@@ -362,8 +399,10 @@ async def main():
         await init()
     elif opt['compose']:
         await compose()
-    elif opt['runlocal']:
-        await runlocal()
+    elif opt['start-native']:
+        await start_native()
+    elif opt['stop-native']:
+        await stop_native()
 
 if __name__ == '__main__':
     asyncio.run(main())

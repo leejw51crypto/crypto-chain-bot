@@ -3,6 +3,7 @@ Prerequisite
 
 * python3
 * ``pip3 install docopt``
+* ``pip3 install supervisor``
 
 Run
 ===
