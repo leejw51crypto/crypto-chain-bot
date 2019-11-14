@@ -14,8 +14,8 @@ Options:
   -d,--data <path>               Set data root directory [default: .].
   -p,--project-name <name>       Used as data directory name and prefix of docker container name [default: default].
   -s,--src <path>                Set chain source directory [default: .].
-  -P,--base-port <port>          Base port number when running in local [default: 26650].
-  --docker                       Use docker.
+  -P,--base-port <port>          Base port number for services [default: 26650].
+  --docker                       Use docker container rather than native binaries.
   --base-fee <fee>               Base fee [default: 0.0].
   --per-byte-fee <fee>           Per byte fee [default: 0.0].
   --enclave-mode <mode>          Envlave mode, SW|HW [default: SW].
