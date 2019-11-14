@@ -21,7 +21,6 @@ Options:
   --tendermint-rpc-port <port>   Exported tendermint rpc port [default: 26657].
   --chain-abci-port <port>       chain-abci listen port when runlocal [default: 26658].
   --enclave-port <port>          tx-enclave listen port when runlocal [default: 25933].
-  --chain-port <port>   Exported tendermint rpc port [default: 26657].
   --client-rpc-port <port>       Exported client rpc port [default: 26659].
   --project-name <name>          Docker project name [default: test].
   -h --help                      Show this screen.
@@ -64,6 +63,7 @@ ADDRESS_STATE_PATH = Path('address-state.json')
 CLIENT_CMD = Path('target/debug/client-cli')
 CHAIN_CMD = Path('target/debug/chain-abci')
 DEVUTIL_PATH = Path('target/debug/dev-utils')
+CLIENT_RPC_PATH = Path('target/debug/client-rpc')
 
 DEV_CONF = '''{
     "rewards_pool": "6250000000000000000",
@@ -323,7 +323,7 @@ async def runlocal():
     chain_port = opt['--chain-abci-port']
     tendermint_port = opt['--tendermint-rpc-port']
     await run(f'docker rm -f {enclave_container_name}', ignore_error=True)
-    await asyncio.sleep(.5)
+    await asyncio.sleep(1)
     await run(f'''
 docker run -d \
 -p {enclave_port}:25933 \
@@ -345,7 +345,13 @@ chain-tx-validation \
 tendermint node --proxy_app=tcp://127.0.0.1:{chain_port} \
 --home={ROOT_PATH / TENDERMINT_PATH} \
 --rpc.laddr=tcp://127.0.0.1:{tendermint_port} \
---consensus.create_empty_blocks=true
+--consensus.create_empty_blocks=true &
+    ''')
+    await asyncio.sleep(1)
+    await run(f'''
+{SRC_PATH / CLIENT_RPC_PATH} --port={opt['--client-rpc-port']} --chain-id={CHAIN_ID} \
+--storage-dir={ROOT_PATH / WALLET_PATH} \
+--websocket-url=ws://127.0.0.1:{opt['--tendermint-rpc-port']}/websocket
     ''')
 
 
