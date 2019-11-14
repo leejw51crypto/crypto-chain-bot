@@ -2,7 +2,7 @@
 '''build robot CLI
 
 Usage:
-  robot.py build [--docker] [--enclave-mode <mode>]
+  robot.py build [--docker] [--enclave-mode <mode>] [--src <path>]
   robot.py init [-d,--data <path>] [--base-fee <fee>] [--per-byte-fee <fee>] [--tendermint <version>] [--docker] [-f, --force]
   robot.py compose  [-d,--data <path>] [--src <path>] [--project-name <name] [--tendermint-rpc-port <port>] [--client-rpc-port <port>]
   robot.py runlocal [-d,--data <path>] [--src <path>] [--tendermint-rpc-port <port>] [--enclave-port <port>] [--chain-abci-port <port>]
@@ -126,11 +126,12 @@ async def interact(cmd, input=None, **kwargs):
 
 
 async def build_chain_image():
-    await run(f'docker build -t "{CHAIN_DOCKER_IMAGE}" -f ./docker/Dockerfile .')
+    await run(f'cd "{SRC_PATH}" && docker build -t "{CHAIN_DOCKER_IMAGE}" -f ./docker/Dockerfile .')
 
 
 async def build_chain_tx_enclave_image(mode):
     await run(f'''
+cd "{SRC_PATH}" && \
 docker build -t "{CHAIN_TX_ENCLAVE_DOCKER_IMAGE}" \
         -f ./chain-tx-enclave/tx-validation/Dockerfile . \
         --build-arg SGX_MODE={mode} \
@@ -222,7 +223,7 @@ async def build():
     if opt['--docker']:
         await build_chain_image()
     else:
-        await run('cargo build')
+        await run(f'cd "{SRC_PATH}" && cargo build')
 
     print('Build tx enclave image')
     await build_chain_tx_enclave_image(opt['--enclave-mode'])
@@ -326,8 +327,4 @@ async def main():
         await runlocal()
 
 if __name__ == '__main__':
-    import signal
-    try:
-        asyncio.run(main())
-    finally:
-        os.kill(os.getpid(), signal.SIGTERM)
+    asyncio.run(main())
