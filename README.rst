@@ -53,13 +53,22 @@ Examples
 
 * Init tendermint genesis, basic staking and transfer wallet addresses, chain storage::
 
-    $ ./robot.py init --src ../chain -d zerofee
-    $ ./robot.py init --src ../chain -d withfee --base-fee 1.1 --per-byte-fee 1.25
+    $ ./robot.py init --src ../chain -d./zerofee
+    $ ./robot.py init --src ../chain -d./withfee --base-fee 1.1 --per-byte-fee 1.25
 
 * Run services with native binaries::
 
-    $ ./robot.py runlocal --src ../chain -d zerofee
+    $ ./robot.py start-native -d./zerofee --src ../chain
+    $ ./robot.py start-native -d./withfee --src ../chain
+
+* Stop native services::
+
+    $ ./robot.py stop-native -d./zerofee
+
+* Monitor native services::
+
+    $ supervisorctl -c ./zerofee/supervisor/tasks.ini
 
 * Run services in docker::
 
-    $ ./robot.py compose --src ../chain -d zerofee --docker
+    $ ./robot.py compose --src ../chain -d./zerofee --docker
