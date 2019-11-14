@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-'''test robot CLI
+'''build robot CLI
 
 Usage:
   robot.py build [--docker] [--enclave-mode <mode>]
@@ -33,10 +33,9 @@ import asyncio
 import json
 import shutil
 from pathlib import Path
-import contextlib
 from docopt import docopt
 
-opt = docopt(__doc__, version='Crypto-com test robot 0.1')
+opt = docopt(__doc__, version='Crypto-com build robot 0.1')
 print(opt)
 
 # constants
@@ -103,17 +102,6 @@ ADDRESS_STATE = '''{
         "%(transfer2)s"
     ]
 }'''
-
-
-@contextlib.asynccontextmanager
-async def spawnbg(cmd, wait_seconds=2, **kwargs):
-    proc = await asyncio.create_subprocess_shell(cmd, **kwargs)
-    await asyncio.sleep(wait_seconds)
-    assert proc.returncode is None or proc.returncode == 0, cmd
-    yield proc
-    if proc.returncode is None:
-        proc.terminate()
-        await proc.wait()
 
 
 async def run(cmd, ignore_error=False, **kwargs):
