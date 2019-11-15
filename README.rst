@@ -11,11 +11,11 @@ Port Usage
 ==========
 
 * base-port: 26650
+* tendermint-p2p-port: base-port + 6
+* tendermint-rpc-port: base-port + 7
+* chain-abci: base-port + 8
 * tx-enclave: base-port + 0
-* chain-abci: base-port + 1
-* tendermint-p2p-port: base-port + 2
-* tendermint-rpc-port: base-port + 3
-* client-rpc-port: base-port + 4
+* client-rpc-port: base-port + 1
 
 Run
 ===
