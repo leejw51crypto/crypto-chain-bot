@@ -96,7 +96,7 @@ DEV_CONF = '''{
         "per_byte_fee": "%(per_byte_fee)s"
     },
     "council_nodes": {
-        "%(staking)s": [
+        "0x3ae55c16800dc4bd0e3397a9d7806fb1f11639de": [
             "integration test",
             "security@integration.test",
         {
