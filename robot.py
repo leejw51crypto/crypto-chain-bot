@@ -53,6 +53,7 @@ WALLET_NAME = 'Default'
 WALLET_PASSPHRASE = '123456'
 CHAIN_ID = "test-chain-y3m1e6-AB"
 CHAIN_HEX_ID = CHAIN_ID[-2:]
+SGX_MODE = opt['--enclave-mode']
 
 # paths
 BASE_DIR = Path(__file__).parent
@@ -195,12 +196,12 @@ async def build_chain_image():
     await run(f'cd "{SRC_PATH}" && docker build -t "{CHAIN_DOCKER_IMAGE}" -f ./docker/Dockerfile .')
 
 
-async def build_chain_tx_enclave_image(mode):
+async def build_chain_tx_enclave_image():
     await run(f'''
 cd "{SRC_PATH}" && \
 docker build -t "{CHAIN_TX_ENCLAVE_DOCKER_IMAGE}" \
         -f ./chain-tx-enclave/tx-validation/Dockerfile . \
-        --build-arg SGX_MODE={mode} \
+        --build-arg SGX_MODE={SGX_MODE} \
         --build-arg NETWORK_ID={CHAIN_HEX_ID}
     ''')
 
@@ -319,7 +320,7 @@ async def build():
         await run(f'cd "{SRC_PATH}" && cargo build')
 
     print('Build tx enclave image')
-    await build_chain_tx_enclave_image(opt['--enclave-mode'])
+    await build_chain_tx_enclave_image()
 
 
 async def init():
