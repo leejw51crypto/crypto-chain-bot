@@ -13,6 +13,7 @@ setup(
         'toml==0.10.0',
         'fire==0.2.1',
         'mnemonic==0.19',
+        'jsonpatch-1.24',
     ],
     scripts=[
         'chainbot.py',

@@ -11,6 +11,7 @@ import os
 import configparser
 import binascii
 
+import jsonpatch
 import fire
 import toml
 import nacl.signing
@@ -307,7 +308,6 @@ async def gen_app_state(cfg):
         json.dump(cfg, fp)
         fp.flush()
         result = await interact(f'{DEVUTIL_CMD} genesis generate -g "{fp.name}"')
-        print(result)
         return json.loads('{%s}' % result.decode('utf-8'))
 
 
@@ -372,7 +372,8 @@ async def gen_genesis(cfg):
         ],
     }
 
-    state = await gen_app_state(app_state_cfg(cfg))
+    patch = jsonpatch.JsonPatch(cfg['config_patch'])
+    state = await gen_app_state(patch.apply(app_state_cfg(cfg)))
     genesis.update(state)
     return genesis
 
@@ -467,7 +468,9 @@ async def populate_wallet_addresses(nodes):
 
 
 class CLI:
-    def gen(self, count=1, rewards_pool=0, genesis_time="2019-11-20T08:56:48.618137Z"):
+    def gen(self, count=1, rewards_pool=0,
+            genesis_time="2019-11-20T08:56:48.618137Z",
+            base_fee='0.0', per_byte_fee='0.0'):
         '''Generate testnet node specification
         :param count: Number of nodes, [default: 1].
         '''
@@ -487,16 +490,21 @@ class CLI:
                     'base_port': BASE_PORT + (i * 10),
                 }
                 for i in range(count)
-            ]
+            ],
+            'config_patch': [
+                {'op': 'replace', 'path': '/initial_fee_policy/base_fee', 'value': '0.0'},
+                {'op': 'replace', 'path': '/initial_fee_policy/per_byte_fee', 'value': '0.0'},
+            ],
         }
         print(json.dumps(cfg, indent=4))
 
-    def prepare(self, spec):
+    def prepare(self, spec=None):
         '''Prepare tendermint testnet based on specification
-        :param spec: Path of specification file, [default: ./cluster.json]
+        :param spec: Path of specification file, [default: stdin]
         '''
-        cfg = json.load(open(spec) if spec != '-' else sys.stdin)
+        cfg = json.load(open(spec) if spec else sys.stdin)
         asyncio.run(init_cluster(cfg))
+        print('Prepared succesfully', ROOT_PATH)
 
 
 if __name__ == '__main__':
