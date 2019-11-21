@@ -70,6 +70,18 @@ Usage
     tasks.ini
     cluster.json
     $ supervisord -n -c tasks.ini
+    
+Manage the running processes: ::
+
+    $ supervisorctl -c tasks.ini
+    node0:chain-abci-node0           RUNNING   pid 12080, uptime 0:00:13
+    node0:client-rpc-node0           RUNNING   pid 12096, uptime 0:00:10
+    node0:tendermint-node0           RUNNING   pid 12065, uptime 0:00:14
+    node0:tx-enclave-node0           RUNNING   pid 12064, uptime 0:00:14
+    node1:chain-abci-node1           RUNNING   pid 12081, uptime 0:00:13
+    node1:client-rpc-node1           RUNNING   pid 12097, uptime 0:00:10
+    node1:tendermint-node1           RUNNING   pid 12068, uptime 0:00:14
+    node1:tx-enclave-node1           RUNNING   pid 12067, uptime 0:00:14
 
 Port Usage
 ==========
