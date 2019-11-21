@@ -2,23 +2,28 @@
 '''build robot CLI
 
 Usage:
-  robot.py build [--docker] [--enclave-mode <mode>] [-s,--src <path>]
-  robot.py init [-d,--data <path>] [-p,--project-name <name>] [-s,--src <path>] [--docker] [-f,--force] [-P,--base-port <port>] [--base-fee <fee>] [--per-byte-fee <fee>]
+  robot.py build-chain [--docker] [-s,--src <path>]
+  robot.py build-enclave [--sgx-mode <mode>] [-s,--src <path>]
+  robot.py init [-d,--data <path>] [--sgx-device <device>] [-p,--project-name <name>] [-s,--src <path>] [--docker] [-f,--force] [-P,--base-port <port>] [--base-fee <fee>] [--per-byte-fee <fee>] [--p2p-seeds <seeds>] [--create-empty-block]
   robot.py compose  [-d,--data <path>] [-p,--project-name <name>] [-s,--src <path>] [-P,--base-port <port>]
-  robot.py start-native [-d,--data <path>] [-p,--project-name <name>] [-s,--src <path>]
-  robot.py stop-native [-d,--data <path>] [-p,--project-name <name>]
+  robot.py start [-d,--data <path>] [-p,--project-name <name>] [-s,--src <path>]
+  robot.py stop [-d,--data <path>] [-p,--project-name <name>]
+  robot.py service [-d,--data] [-p,--project-name] [--] [<arg>...]
   robot.py (-h | --help)
   robot.py --version
 
 Options:
-  -d,--data <path>               Set data root directory [default: .].
+  -d,--data <path>               Set data root directory, default: $DATA_PATH.
   -p,--project-name <name>       Used as data directory name and prefix of docker container name [default: default].
-  -s,--src <path>                Set chain source directory [default: .].
+  -s,--src <path>                Set chain source directory, default: $SRC_PATH.
   -P,--base-port <port>          Base port number for services [default: 26650].
   --docker                       Use docker container rather than native binaries.
   --base-fee <fee>               Base fee [default: 0.0].
   --per-byte-fee <fee>           Per byte fee [default: 0.0].
-  --enclave-mode <mode>          Envlave mode, SW|HW [default: SW].
+  --sgx-mode <mode>              SGX mode, SW|HW, [default: SW].
+  --sgx-device <device>          SGX device name, default to software mode.
+  --p2p-seeds <seeds>            Tendermint node p2p seeds.
+  --create-empty-block           Set tendermint --consensus.create_empty_blocks=true.
   -f,--force                     Override existing data directory.
   -h --help                      Show this screen.
   -v,--version                   Show version.
@@ -30,8 +35,10 @@ import json
 import shutil
 import base64
 import hashlib
+
 from pathlib import Path
 from docopt import docopt
+from decouple import config
 
 opt = docopt(__doc__, version='Crypto-com build robot 0.1')
 # print(opt)
@@ -53,13 +60,16 @@ WALLET_NAME = 'Default'
 WALLET_PASSPHRASE = '123456'
 CHAIN_ID = "test-chain-y3m1e6-AB"
 CHAIN_HEX_ID = CHAIN_ID[-2:]
-SGX_MODE = opt['--enclave-mode']
+SGX_DEVICE = opt['--sgx-device']
+SGX_MODE = opt['--sgx-mode'] or ('HW' if SGX_DEVICE else 'SW')
+P2P_SEEDS = opt['--p2p-seeds']
 
 # paths
 BASE_DIR = Path(__file__).parent
 COMPOSE_FILE = BASE_DIR / 'docker-compose.yml'
-ROOT_PATH = (Path(opt['--data']) / Path(opt['--project-name'])).resolve()
-SRC_PATH = Path(opt['--src']).resolve()
+DATA_PATH = Path(opt['--data'] or config('DATA_PATH', '.')).resolve()
+ROOT_PATH = DATA_PATH / Path(opt['--project-name'])
+SRC_PATH = Path(opt['--src'] or config('SRC_PATH', '.')).resolve()
 GENESIS_PATH = Path('config/genesis.json')
 ENCLAVE_PATH = Path('enclave')
 TENDERMINT_PATH = Path('tendermint')
@@ -141,7 +151,7 @@ file=%(here)s/supervisor.sock
 serverurl=unix://%(here)s/supervisor.sock
 
 [program:tx-enclave]
-command=docker run --rm -p {ENCLAVE_PORT}:25933 --env RUST_BACKTRACE=1 --env RUST_LOG=info --name {opt['--project-name'] + '-tx-enclave'} -v {ROOT_PATH / ENCLAVE_PATH}:/enclave-storage chain-tx-validation
+command=docker run --rm -p {ENCLAVE_PORT}:25933 --env RUST_BACKTRACE=1 --env RUST_LOG=info --name {opt['--project-name'] + '-tx-enclave'} -v {ROOT_PATH / ENCLAVE_PATH}:/enclave-storage {'--device' + SGX_DEVICE if SGX_DEVICE else ''} {CHAIN_TX_ENCLAVE_DOCKER_IMAGE}-{SGX_MODE.lower()}
 stdout_logfile=%(here)s/tx-enclave.log
 autostart=true
 autorestart=true
@@ -156,7 +166,7 @@ autorestart=true
 redirect_stderr=true
 
 [program:tendermint]
-command=tendermint node --proxy_app=tcp://127.0.0.1:{CHAIN_ABCI_PORT} --home={ROOT_PATH / TENDERMINT_PATH} --rpc.laddr=tcp://127.0.0.1:{TENDERMINT_RPC_PORT} --p2p.laddr=tcp://127.0.0.1:{TENDERMINT_P2P_PORT} --consensus.create_empty_blocks=true
+command=tendermint node --proxy_app=tcp://127.0.0.1:{CHAIN_ABCI_PORT} --home={ROOT_PATH / TENDERMINT_PATH} --rpc.laddr=tcp://127.0.0.1:{TENDERMINT_RPC_PORT} --p2p.laddr=tcp://127.0.0.1:{TENDERMINT_P2P_PORT} {'--consensus.create_empty_blocks=true' if opt['--create-empty-block'] else '--consensus.create_empty_blocks=false'} --p2p.seeds=%(ENV_P2P_PEERS)s
 stdout_logfile=%(here)s/tendermint.log
 autostart=true
 autorestart=true
@@ -175,8 +185,9 @@ redirect_stderr=true
 async def run(cmd, ignore_error=False, **kwargs):
     print('Execute:', cmd)
     proc = await asyncio.create_subprocess_shell(cmd, **kwargs)
+    retcode = await proc.wait()
     if not ignore_error:
-        assert await proc.wait() == 0, cmd
+        assert retcode == 0, cmd
 
 
 async def interact(cmd, input=None, **kwargs):
@@ -199,7 +210,7 @@ async def build_chain_image():
 async def build_chain_tx_enclave_image():
     await run(f'''
 cd "{SRC_PATH}" && \
-docker build -t "{CHAIN_TX_ENCLAVE_DOCKER_IMAGE}" \
+docker build -t "{CHAIN_TX_ENCLAVE_DOCKER_IMAGE}-{SGX_MODE.lower()}" \
         -f ./chain-tx-enclave/tx-validation/Dockerfile . \
         --build-arg SGX_MODE={SGX_MODE} \
         --build-arg NETWORK_ID={CHAIN_HEX_ID}
@@ -312,13 +323,15 @@ docker run -i --rm \
     json.dump(genesis, open(genesis_path, 'w'), indent=4)
 
 
-async def build():
+async def build_chain():
     print('Build chain')
     if opt['--docker']:
         await build_chain_image()
     else:
         await run(f'cd "{SRC_PATH}" && cargo build')
 
+
+async def build_enclave():
     print('Build tx enclave image')
     await build_chain_tx_enclave_image()
 
@@ -387,13 +400,13 @@ async def compose():
                        ))
 
 
-async def start_native():
-    await stop_native()
+async def start():
+    await stop()
     supervisor_path = ROOT_PATH / SUPERVISOR_PATH
     await run(f'supervisord -d {supervisor_path} -c {supervisor_path / TASKS_INI_PATH} -l {supervisor_path / Path("supervisord.log")} -j {supervisor_path / Path("supervisord.pid")}')
 
 
-async def stop_native():
+async def stop():
     supervisor_path = ROOT_PATH / SUPERVISOR_PATH
     pid_path = supervisor_path / Path('supervisord.pid')
     if pid_path.exists():
@@ -403,17 +416,25 @@ async def stop_native():
     await asyncio.sleep(1)
 
 
+async def service():
+    await run(f'supervisorctl -c {opt["--project-name"]}/supervisor/tasks.ini ' + ' '.join(opt['<arg>']), ignore_error=True)
+
+
 async def main():
-    if opt['build']:
-        await build()
+    if opt['build-enclave']:
+        await build_enclave()
+    if opt['build-chain']:
+        await build_chain()
     elif opt['init']:
         await init()
     elif opt['compose']:
         await compose()
-    elif opt['start-native']:
-        await start_native()
-    elif opt['stop-native']:
-        await stop_native()
+    elif opt['start']:
+        await start()
+    elif opt['stop']:
+        await stop()
+    elif opt['service']:
+        await service()
 
 if __name__ == '__main__':
     check_prerequisite()
