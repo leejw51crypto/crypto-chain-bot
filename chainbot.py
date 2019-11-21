@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import sys
 import base64
 import hashlib
 import json
@@ -16,7 +17,6 @@ import nacl.signing
 from nacl.encoding import HexEncoder
 from decouple import config
 
-SRC_PATH = Path(config('SRC_PATH', '.')).resolve()
 ROOT_PATH = Path(config('ROOT_PATH', '.')).resolve()
 BASE_PORT = config('BASE_PORT', 26650, cast=int)
 SGX_DEVICE = config('SGX_DEVICE', None)
@@ -26,10 +26,10 @@ CHAIN_TX_ENCLAVE_DOCKER_IMAGE = config('CHAIN_TX_ENCLAVE_DOCKER_IMAGE',
                                        'integration-tests-chain-tx-enclave')
 CHAIN_ID = config('CHAIN_ID', 'test-chain-y3m1e6-AB')
 
-DEVUTIL_CMD = Path('target/debug/dev-utils')
-CLIENT_CMD = Path('target/debug/client-cli')
-CHAIN_CMD = Path('target/debug/chain-abci')
-CLIENT_RPC_CMD = Path('target/debug/client-rpc')
+DEVUTIL_CMD = Path('dev-utils')
+CLIENT_CMD = Path('client-cli')
+CHAIN_CMD = Path('chain-abci')
+CLIENT_RPC_CMD = Path('client-rpc')
 
 
 class SigningKey:
@@ -222,9 +222,9 @@ def programs(node, app_hash):
     client_rpc_port = base_port + 1
     commands = [
         ('tx-enclave', f'''docker run --rm -p {base_port}:25933 --env RUST_BACKTRACE=1 --env RUST_LOG=info -v {node_path / Path('enclave')}:/enclave-storage {'--device ' + SGX_DEVICE if SGX_DEVICE else ''} {CHAIN_TX_ENCLAVE_DOCKER_IMAGE}-{SGX_MODE.lower()}'''),
-        ('chain-abci', f'''{SRC_PATH / CHAIN_CMD} -g {app_hash} -c {CHAIN_ID} --enclave_server tcp://127.0.0.1:{base_port} --data {node_path / Path('chain')} -p {chain_abci_port}'''),
+        ('chain-abci', f'''{CHAIN_CMD} -g {app_hash} -c {CHAIN_ID} --enclave_server tcp://127.0.0.1:{base_port} --data {node_path / Path('chain')} -p {chain_abci_port}'''),
         ('tendermint', f'''tendermint node --home={node_path / Path('tendermint')}'''),
-        ('client-rpc', f'''{SRC_PATH / CLIENT_RPC_CMD} --port={client_rpc_port} --chain-id={CHAIN_ID} --storage-dir={node_path / Path('wallet')} --websocket-url=ws://127.0.0.1:{tendermint_rpc_port}/websocket'''),
+        ('client-rpc', f'''{CLIENT_RPC_CMD} --port={client_rpc_port} --chain-id={CHAIN_ID} --storage-dir={node_path / Path('wallet')} --websocket-url=ws://127.0.0.1:{tendermint_rpc_port}/websocket'''),
     ]
 
     return {
@@ -306,7 +306,7 @@ async def gen_app_state(cfg):
     with tempfile.NamedTemporaryFile('w') as fp:
         json.dump(cfg, fp)
         fp.flush()
-        result = await interact(f'{SRC_PATH / DEVUTIL_CMD} genesis generate -g "{fp.name}"')
+        result = await interact(f'{DEVUTIL_CMD} genesis generate -g "{fp.name}"')
         print(result)
         return json.loads('{%s}' % result.decode('utf-8'))
 
@@ -318,7 +318,7 @@ async def gen_wallet_addr(mnemonic, type='Staking', count=1):
     }[type]
     with tempfile.TemporaryDirectory() as dirname:
         await interact(
-            f'{SRC_PATH / CLIENT_CMD} wallet restore --name Default',
+            f'{CLIENT_CMD} wallet restore --name Default',
             ('123456\n123456\n%s\n%s\n' % (mnemonic, mnemonic)).encode(),
             env=dict(
                 os.environ,
@@ -328,7 +328,7 @@ async def gen_wallet_addr(mnemonic, type='Staking', count=1):
         addrs = []
         for i in range(count):
             result = (await interact(
-                f'{SRC_PATH / CLIENT_CMD} address new --name Default --type {type}',
+                f'{CLIENT_CMD} address new --name Default --type {type}',
                 b'123456\n',
                 env=dict(
                     os.environ,
@@ -491,11 +491,11 @@ class CLI:
         }
         print(json.dumps(cfg, indent=4))
 
-    def prepare(self, spec='./cluster.json'):
+    def prepare(self, spec):
         '''Prepare tendermint testnet based on specification
         :param spec: Path of specification file, [default: ./cluster.json]
         '''
-        cfg = json.load(open(spec))
+        cfg = json.load(open(spec) if spec != '-' else sys.stdin)
         asyncio.run(init_cluster(cfg))
 
 
