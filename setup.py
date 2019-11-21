@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name='chainbot',
+    name='crypto-chain-bot',
     version='1.0',
     description='Prepare testnet environment for crypto-com chain.',
     author='yihuagn',
@@ -13,7 +13,7 @@ setup(
         'toml==0.10.0',
         'fire==0.2.1',
         'mnemonic==0.19',
-        'jsonpatch-1.24',
+        'jsonpatch==1.24',
     ],
     scripts=[
         'chainbot.py',
