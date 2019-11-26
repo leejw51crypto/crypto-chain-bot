@@ -165,27 +165,27 @@ class Blockchain:
         return call_chain('unconfirmed_txs')
 
     def latest_height(self):
-        return self.status()['latest_block_height']
+        return self.status()['sync_info']['latest_block_height']
 
     def validators(self, height='latest'):
         height = height if height != 'latest' else self.latest_height()
-        return call_chain('validators', height)
+        return call_chain('validators', str(height))
 
     def block(self, height='latest'):
         height = height if height != 'latest' else self.latest_height()
-        return call_chain('block', height)
+        return call_chain('block', str(height))
 
     def block_results(self, height='latest'):
         height = height if height != 'latest' else self.latest_height()
-        return call_chain('block_results', height)
+        return call_chain('block_results', str(height))
 
     def chain(self, min_height, max_height='latest'):
         max_height = max_height if max_height != 'latest' else self.latest_height()
-        return call_chain('blockchain', min_height, max_height)
+        return call_chain('blockchain', str(min_height), str(max_height))
 
     def commit(self, height='latest'):
         height = height if height != 'latest' else self.latest_height()
-        return call_chain('commit', height)
+        return call_chain('commit', str(height))
 
     def query(self, path, data, proof=False):
         return call_chain('abci_query', path, data, proof)
@@ -203,7 +203,7 @@ class Blockchain:
         return call_chain('tx', txid)
 
 
-class CLI:
+class RPC:
     def __init__(self):
         self.wallet = Wallet()
         self.staking = Staking()
@@ -228,4 +228,4 @@ class CLI:
 
 
 if __name__ == '__main__':
-    fire.Fire(CLI())
+    fire.Fire(RPC())
