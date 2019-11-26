@@ -172,8 +172,8 @@ def priv_validator_key(seed):
 def node_key(seed):
     sk = SigningKey(seed)
     return {
-        'priv_key':{
-            'type':'tendermint/PrivKeyEd25519',
+        'priv_key': {
+            'type': 'tendermint/PrivKeyEd25519',
             'value': sk.priv_key_base64(),
         }
     }
