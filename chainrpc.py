@@ -27,6 +27,14 @@ def call_chain(method, *args):
     return rsp.data.result
 
 
+def fix_address(addr):
+    'fire convert staking addr to int automatically, fix it.'
+    if isinstance(addr, int):
+        return hex(addr)
+    else:
+        return addr
+
+
 class Address:
     def list(self, name=DEFAULT_WALLET, type='staking'):
         '''list addresses
@@ -84,7 +92,7 @@ class Wallet:
         return call(
             'wallet_sendToAddress',
             [name, get_passphrase()],
-            to_address, amount, view_keys or [])
+            to_address, str(amount), view_keys or [])
 
     def sync(self, name=DEFAULT_WALLET):
         return call('sync', [name, get_passphrase()])
@@ -101,23 +109,23 @@ class Wallet:
 
 class Staking:
     def deposit_stake(self, to_address, inputs, name=DEFAULT_WALLET):
-        return call('staking_depositStake', [name, get_passphrase()], hex(to_address), inputs)
+        return call('staking_depositStake', [name, get_passphrase()], fix_address(to_address), inputs)
 
     def state(self, address, name=DEFAULT_WALLET):
-        return call('staking_state', [name, get_passphrase()], hex(address))
+        return call('staking_state', [name, get_passphrase()], fix_address(address))
 
     def unbond_stake(self, address, amount, name=DEFAULT_WALLET):
-        return call('staking_unbondStake', [name, get_passphrase()], hex(address), amount)
+        return call('staking_unbondStake', [name, get_passphrase()], fix_address(address), amount)
 
     def withdraw_all_unbonded_stake(self, from_address, to_address, name=DEFAULT_WALLET):
         return call(
             'staking_withdrawAllUnbondedStake',
             [name, get_passphrase()],
-            hex(from_address), to_address, []
+            fix_address(from_address), to_address, []
         )
 
     def unjail(self, address, name=DEFAULT_WALLET):
-        return call('staking_unjail', [name, get_passphrase()], hex(address))
+        return call('staking_unjail', [name, get_passphrase()], fix_address(address))
 
 
 class MultiSig:
