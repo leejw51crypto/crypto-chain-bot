@@ -31,8 +31,6 @@ CLIENT_CMD = Path('client-cli')
 CHAIN_CMD = Path('chain-abci')
 CLIENT_RPC_CMD = Path('client-rpc')
 
-CREATE_EMPTY_BLOCK = config('CREATE_EMPTY_BLOCK', True, cast=bool)
-
 
 class SigningKey:
     def __init__(self, seed):
@@ -137,7 +135,7 @@ def tendermint_cfg(moniker, app_port, rpc_port, p2p_port, peers):
             'timeout_precommit_delta': '500ms',
             'timeout_commit': '1s',
             'skip_timeout_commit': False,
-            'create_empty_blocks': CREATE_EMPTY_BLOCK,
+            'create_empty_blocks': True,
             'create_empty_blocks_interval': '5s',
             'peer_gossip_sleep_duration': '100ms',
             'peer_query_maj23_sleep_duration': '2s'
@@ -373,7 +371,7 @@ async def gen_genesis(cfg):
         ],
     }
 
-    patch = jsonpatch.JsonPatch(cfg['config_patch'])
+    patch = jsonpatch.JsonPatch(cfg['chain_config_patch'])
     state = await gen_app_state(patch.apply(app_state_cfg(cfg)))
     genesis.update(state)
     return genesis
@@ -433,12 +431,20 @@ async def init_cluster(cfg):
         json.dump(node_key(node['validator_seed']),
                   open(cfg_path / Path('priv_validator_key.json'), 'w'),
                   indent=4)
-        toml.dump(tendermint_cfg(node_name,
-                                 BASE_PORT + (i * 10) + 8,
-                                 BASE_PORT + (i * 10) + 7,
-                                 BASE_PORT + (i * 10) + 6,
-                                 peers),
-                  open(cfg_path / Path('config.toml'), 'w'))
+
+        patch = jsonpatch.JsonPatch(cfg['tendermint_config_patch'])
+        toml.dump(
+            patch.apply(
+                tendermint_cfg(
+                    node_name,
+                    BASE_PORT + (i * 10) + 8,
+                    BASE_PORT + (i * 10) + 7,
+                    BASE_PORT + (i * 10) + 6,
+                    peers
+                )
+            ),
+            open(cfg_path / Path('config.toml'), 'w')
+        )
 
         data_path = ROOT_PATH / Path(node_name) / Path('tendermint') / Path('data')
         if not data_path.exists():
@@ -493,9 +499,12 @@ class CLI:
                 }
                 for i in range(count)
             ],
-            'config_patch': [
+            'chain_config_patch': [
                 {'op': 'replace', 'path': '/initial_fee_policy/base_fee', 'value': '0.0'},
                 {'op': 'replace', 'path': '/initial_fee_policy/per_byte_fee', 'value': '0.0'},
+            ],
+            'tendermint_config_patch': [
+                {'op': 'replace', 'path': '/consensus/create_empty_blocks', 'value': True},
             ],
         }
         print(json.dumps(cfg, indent=4))
