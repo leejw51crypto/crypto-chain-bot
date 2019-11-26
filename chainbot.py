@@ -25,7 +25,6 @@ SGX_MODE = 'HW' if SGX_DEVICE else 'SW'
 
 CHAIN_TX_ENCLAVE_DOCKER_IMAGE = config('CHAIN_TX_ENCLAVE_DOCKER_IMAGE',
                                        'integration-tests-chain-tx-enclave')
-CHAIN_ID = config('CHAIN_ID', 'test-chain-y3m1e6-AB')
 
 DEVUTIL_CMD = Path('dev-utils')
 CLIENT_CMD = Path('client-cli')
@@ -215,7 +214,7 @@ def app_state_cfg(cfg):
     }
 
 
-def programs(node, app_hash):
+def programs(node, app_hash, chain_id):
     node_path = ROOT_PATH / Path(node['name'])
     base_port = node['base_port']
     chain_abci_port = base_port + 8
@@ -223,9 +222,9 @@ def programs(node, app_hash):
     client_rpc_port = base_port + 1
     commands = [
         ('tx-enclave', f'''docker run --rm -p {base_port}:25933 --env RUST_BACKTRACE=1 --env RUST_LOG=info -v {node_path / Path('enclave')}:/enclave-storage {'--device ' + SGX_DEVICE if SGX_DEVICE else ''} {CHAIN_TX_ENCLAVE_DOCKER_IMAGE}-{SGX_MODE.lower()}'''),
-        ('chain-abci', f'''{CHAIN_CMD} -g {app_hash} -c {CHAIN_ID} --enclave_server tcp://127.0.0.1:{base_port} --data {node_path / Path('chain')} -p {chain_abci_port}'''),
+        ('chain-abci', f'''{CHAIN_CMD} -g {app_hash} -c {chain_id} --enclave_server tcp://127.0.0.1:{base_port} --data {node_path / Path('chain')} -p {chain_abci_port}'''),
         ('tendermint', f'''tendermint node --home={node_path / Path('tendermint')}'''),
-        ('client-rpc', f'''{CLIENT_RPC_CMD} --port={client_rpc_port} --chain-id={CHAIN_ID} --storage-dir={node_path / Path('wallet')} --websocket-url=ws://127.0.0.1:{tendermint_rpc_port}/websocket'''),
+        ('client-rpc', f'''{CLIENT_RPC_CMD} --port={client_rpc_port} --chain-id={chain_id} --storage-dir={node_path / Path('wallet')} --websocket-url=ws://127.0.0.1:{tendermint_rpc_port}/websocket'''),
     ]
 
     return {
@@ -244,7 +243,7 @@ def programs(node, app_hash):
     }
 
 
-def tasks_ini(node_cfgs, app_hash):
+def tasks_ini(node_cfgs, app_hash, chain_id):
     ini = {
         'supervisord': {
             'pidfile': '%(here)s/supervisord.pid',
@@ -261,7 +260,7 @@ def tasks_ini(node_cfgs, app_hash):
     }
 
     for node in node_cfgs:
-        prgs = programs(node, app_hash)
+        prgs = programs(node, app_hash, chain_id)
         ini['group:%s' % node['name']] = {
             'programs': ','.join(name.split(':', 1)[1]
                                  for name in prgs.keys()),
@@ -342,7 +341,7 @@ async def gen_wallet_addr(mnemonic, type='Staking', count=1):
 async def gen_genesis(cfg):
     genesis = {
         "genesis_time": cfg['genesis_time'],
-        "chain_id": CHAIN_ID,
+        "chain_id": cfg['chain_id'],
         "consensus_params": {
             "block": {
                 "max_bytes": "22020096",
@@ -449,7 +448,7 @@ async def init_cluster(cfg):
         }, open(data_path / Path('priv_validator_state.json'), 'w'))
 
     write_tasks_ini(open(ROOT_PATH / Path('tasks.ini'), 'w'),
-                    tasks_ini(cfg['nodes'], app_hash))
+                    tasks_ini(cfg['nodes'], app_hash, cfg['chain_id']))
 
 
 def gen_mnemonic():
@@ -477,6 +476,7 @@ class CLI:
         max_coin = 10000000000000000000
         share = int(int(max_coin - rewards_pool) / count / 2)
         cfg = {
+            'chain_id': config('CHAIN_ID', 'test-chain-y3m1e6-AB'),
             'genesis_time': genesis_time,
             'rewards_pool': rewards_pool,
             'nodes': [
