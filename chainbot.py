@@ -207,9 +207,8 @@ def programs(node, app_hash, root_path, cfg):
     tendermint_rpc_port = base_port + 7
     client_rpc_port = base_port + 1
     sgx_device = cfg.get('sgx_device')
-    sgx_mode = 'hw' if sgx_device else 'sw'
     commands = [
-        ('tx-enclave', f'''docker run --rm -p {base_port}:25933 --env RUST_BACKTRACE=1 --env RUST_LOG=info -v {node_path / Path('enclave')}:/enclave-storage {'--device ' + sgx_device if sgx_device else ''} {cfg['enclave_docker_image']}-{sgx_mode}'''),
+        ('tx-enclave', f'''docker run --rm -p {base_port}:25933 --env RUST_BACKTRACE=1 --env RUST_LOG=info -v {node_path / Path('enclave')}:/enclave-storage {'--device ' + sgx_device if sgx_device else ''} {cfg['enclave_docker_image']}'''),
         ('chain-abci', f'''chain-abci -g {app_hash} -c {cfg['chain_id']} --enclave_server tcp://127.0.0.1:{base_port} --data {node_path / Path('chain')} -p {chain_abci_port}'''),
         ('tendermint', f'''tendermint node --home={node_path / Path('tendermint')}'''),
         ('client-rpc', f'''client-rpc --port={client_rpc_port} --chain-id={cfg['chain_id']} --storage-dir={node_path / Path('wallet')} --websocket-url=ws://127.0.0.1:{tendermint_rpc_port}/websocket'''),
@@ -445,6 +444,9 @@ async def init_cluster(cfg):
             "step": 0
         }, open(data_path / Path('priv_validator_state.json'), 'w'))
 
+    logs_path = root_path / Path('logs')
+    if not logs_path.exists():
+        logs_path.mkdir()
     write_tasks_ini(open(root_path / Path('tasks.ini'), 'w'),
                     tasks_ini(cfg['nodes'], app_hash, root_path, cfg))
 
@@ -469,7 +471,7 @@ class CLI:
             genesis_time="2019-11-20T08:56:48.618137Z",
             base_fee='0.0', per_byte_fee='0.0',
             base_port=26650, sgx_device=None,
-            chain_id='test-chain-y3m1e6-AB'):
+            chain_id='test-chain-y3m1e6-AB', root_path='./data'):
         '''Generate testnet node specification
         :param count: Number of nodes, [default: 1].
         '''
@@ -477,7 +479,7 @@ class CLI:
         share = int(int(max_coin - rewards_pool) / count / 2)
         sgx_mode = '' if sgx_device else '-sw'
         cfg = {
-            'root_path': '.',
+            'root_path': './data',
             'chain_id': chain_id,
             'sgx_device': sgx_device,
             'enclave_docker_image': 'integration-tests-chain-tx-enclave' + sgx_mode,
