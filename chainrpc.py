@@ -66,7 +66,7 @@ class Wallet:
         :param name: Name of the wallet. [defualt: Default]
         :param mnemonics: mnemonics words
         '''
-        return call('wallet_restore', [name, get_passphrase()])
+        return call('wallet_restore', [name, get_passphrase()], mnemonics)
 
     def view_key(self, name=DEFAULT_WALLET):
         return call(
@@ -85,6 +85,18 @@ class Wallet:
             'wallet_sendToAddress',
             [name, get_passphrase()],
             to_address, amount, view_keys or [])
+
+    def sync(self, name=DEFAULT_WALLET):
+        return call('sync', [name, get_passphrase()])
+
+    def sync_all(self, name=DEFAULT_WALLET):
+        return call('sync_all', [name, get_passphrase()])
+
+    def sync_unlock(self, name=DEFAULT_WALLET):
+        return call('sync_unlockWallet', [name, get_passphrase()])
+
+    def sync_stop(self, name=DEFAULT_WALLET):
+        return call('sync_stop', [name, get_passphrase()])
 
 
 class Staking:
@@ -213,18 +225,6 @@ class RPC:
 
     def raw_tx(self, inputs, outputs, view_keys):
         return call('transaction_createRaw', inputs, outputs, view_keys)
-
-    def sync(self, name=DEFAULT_WALLET):
-        return call('sync', [name, get_passphrase()])
-
-    def sync_all(self, name=DEFAULT_WALLET):
-        return call('sync_all', [name, get_passphrase()])
-
-    def sync_unlock(self, name=DEFAULT_WALLET):
-        return call('sync_unlockWallet', [name, get_passphrase()])
-
-    def sync_stop(self, name=DEFAULT_WALLET):
-        return call('sync_stop', [name, get_passphrase()])
 
 
 if __name__ == '__main__':
