@@ -402,7 +402,7 @@ async def init_cluster(cfg):
     peers = gen_peers(cfg['nodes'])
     genesis = await gen_genesis(cfg)
     app_hash = genesis['app_hash']
-    root_path = Path(cfg['root_path'])
+    root_path = Path(cfg['root_path']).resolve()
 
     for i, node in enumerate(cfg['nodes']):
         base_port = node['base_port']
