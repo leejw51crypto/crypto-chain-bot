@@ -130,9 +130,7 @@ Tendermint RPC
 
 ::
 
-    $ chainrpc.py wallet transactions
-    {"block_height": 64, "block_time": "2019-11-26T08:43:36.950326Z", "inputs": [], "kind": "Incoming", "outputs": [{"address": "dcro14rd97zpjh38a9l9sza4z7zzatfyjas04xy0yq3v75hmxdju7cwrs94yn76", "valid_from": 1574240208, "value": "5000000000000000000"}], "transaction_id": "d68732a45412f319b10e1bfe025e724c1e61e0a8ef80e8f490919cb4ed526b8c", "transaction_type": "Withdraw", "value": "5000000000000000000"}
-    λ ~/testnet1/ chainrpc.py chain status
+    $ chainrpc.py chain status
     node_info:      {"protocol_version": {"p2p": "7", "block": "10", "app": "0"}, "id": "3135de411a5028c61c12ab6635add83ead051342", "listen_addr": "tcp://0.0.0.0:26656", "network": "test-chain-y3m1e6-AB", "version": "0.32.7", "channels": "4020212223303800", "moniker": "node0", "other": {"tx_index": "on", "rpc_address": "tcp://127.0.0.1:26657"}}
     sync_info:      {"latest_block_hash": "A4C30E0C9A2DC3630233AE8DD9459588CFE7994E6E47C0AE017FEB00AC119AE0", "latest_app_hash": "97500A2754824891C5E56FD39DCD2B670331232FDD9ABDCA07453E5F97F8D856", "latest_block_height": "180", "latest_block_time": "2019-11-26T08:45:42.203115Z", "catching_up": false}
     validator_info: {"address": "9004A42E6DD6E4D0A088F26EFF11A2DF699D0238", "pub_key": {"type": "tendermint/PubKeyEd25519", "value": "1GcI44AMk2O0puoBBszFCSzWIxlGQP8qOGiGBqUJ+Lk="}, "voting_power": "50000000000"}
