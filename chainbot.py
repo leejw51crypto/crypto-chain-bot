@@ -31,6 +31,8 @@ CLIENT_CMD = Path('client-cli')
 CHAIN_CMD = Path('chain-abci')
 CLIENT_RPC_CMD = Path('client-rpc')
 
+CREATE_EMPTY_BLOCK = config('CREATE_EMPTY_BLOCK', True, cast=bool)
+
 
 class SigningKey:
     def __init__(self, seed):
@@ -135,7 +137,7 @@ def tendermint_cfg(moniker, app_port, rpc_port, p2p_port, peers):
             'timeout_precommit_delta': '500ms',
             'timeout_commit': '1s',
             'skip_timeout_commit': False,
-            'create_empty_blocks': True,
+            'create_empty_blocks': CREATE_EMPTY_BLOCK,
             'create_empty_blocks_interval': '5s',
             'peer_gossip_sleep_duration': '100ms',
             'peer_query_maj23_sleep_duration': '2s'
