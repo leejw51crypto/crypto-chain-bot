@@ -122,7 +122,7 @@ def tendermint_cfg(moniker, app_port, rpc_port, p2p_port, peers):
             'timeout_commit': '1s',
             'skip_timeout_commit': False,
             'create_empty_blocks': True,
-            'create_empty_blocks_interval': '5s',
+            'create_empty_blocks_interval': '0s',
             'peer_gossip_sleep_duration': '100ms',
             'peer_query_maj23_sleep_duration': '2s'
         },
@@ -503,6 +503,7 @@ class CLI:
             ],
             'tendermint_config_patch': [
                 {'op': 'replace', 'path': '/consensus/create_empty_blocks', 'value': True},
+                {'op': 'add', 'path': '/consensus/create_empty_blocks_interval', 'value': '0s'},
             ],
         }
         print(json.dumps(cfg, indent=4))
