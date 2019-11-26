@@ -102,11 +102,55 @@ class Staking:
         return req('staking_unjail', [name, get_passphrase()], hex(address))
 
 
+class MultiSig:
+    def create_address(self, public_keys, self_public_key, required_signatures, name=DEFAULT_WALLET):
+        return req('multiSig_createAddress',
+                   [name, get_passphrase()],
+                   public_keys,
+                   self_public_key,
+                   required_signatures)
+
+    def new_session(self, message, signer_public_keys, self_public_key, name=DEFAULT_WALLET):
+        return req('multiSig_newSession',
+                   [name, get_passphrase()],
+                   message,
+                   signer_public_keys,
+                   self_public_key)
+
+    def nonce_commitment(self, session_id, passphrase):
+        return req('multiSig_nonceCommitment', session_id, passphrase)
+
+    def add_nonce_commitment(self, session_id, passphrase, nonce_commitment, public_key):
+        return req('multiSig_addNonceCommitment', session_id, passphrase, nonce_commitment, public_key)
+
+    def nonce(self, session_id, passphrase):
+        return req('multiSig_nonce', session_id, passphrase)
+
+    def add_nonce(self, session_id, passphrase, nonce, public_key):
+        return req('multiSig_addNonce', session_id, passphrase, nonce, public_key)
+
+    def partial_signature(self, session_id, passphrase):
+        return req('multiSig_partialSign', session_id, passphrase)
+
+    def add_partial_signature(self, session_id, passphrase, partial_signature, public_key):
+        return req('multiSig_addPartialSignature', session_id, passphrase, partial_signature, public_key)
+
+    def signature(self, session_id, passphrase):
+        return req('multiSig_signature', session_id, passphrase)
+
+    def broadcast_with_signature(self, session_id, unsigned_transaction, name=DEFAULT_WALLET):
+        return req('multiSig_broadcastWithSignature',
+                   [name, get_passphrase()],
+                   session_id,
+                   unsigned_transaction)
+
+
 class CLI:
     def __init__(self):
         self.wallet = Wallet()
         self.staking = Staking()
         self.address = Address()
+        self.multisig = MultiSig()
 
     def raw_tx(self, inputs, outputs, view_keys):
         return req('transaction_createRaw', inputs, outputs, view_keys)
