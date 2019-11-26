@@ -18,6 +18,6 @@ setup(
     ],
     scripts=[
         'chainbot.py',
-        'clientrpc.py',
+        'chainrpc.py',
     ]
 )
